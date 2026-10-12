@@ -1,24 +1,395 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-	<title>Prices Crawler</title>
-	<style>
-		body {
-			background-color: #212529;
-			color: white;
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			justify-content: center;
-			height: 100vh;
-			margin: 0;
-			padding: 0;
-		}
-	</style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prices Crawler · open-source price comparison framework</title>
+<meta name="description" content="content-base is a reactive Spring Boot framework for building price comparison APIs. Caching, price history and the REST API come built in; each store is one class.">
+<link rel="icon" href="resources/images/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root {
+  --paper: #f6f7f4;
+  --surface: #ffffff;
+  --ink: #15191f;
+  --muted: #5b6370;
+  --line: #d9ddd6;
+  --label: #f2d21b;
+  --label-ink: #15191f;
+  --good: #1f7a4d;
+  --chart: #2a4f8f;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12151a; --surface: #1a1f26; --ink: #eef0ec; --muted: #9aa3ae; --line: #2c333c;
+    --label: #e9c912; --label-ink: #15191f; --good: #4cc18a; --chart: #7fa6ea; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12151a; --surface: #1a1f26; --ink: #eef0ec; --muted: #9aa3ae; --line: #2c333c;
+  --label: #e9c912; --label-ink: #15191f; --good: #4cc18a; --chart: #7fa6ea; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 980px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 80px; display: grid; gap: 64px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.05; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.4rem, 6vw, 4.2rem); font-weight: 850; font-stretch: 72%; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.6rem, 3.6vw, 2.3rem); font-weight: 800; font-stretch: 80%; }
+h3 { font-size: 1.15rem; font-weight: 700; font-stretch: 95%; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+section { display: grid; gap: 20px; }
+.muted { color: var(--muted); }
+
+.replay:focus-visible, .chip:focus-visible, .nav a:focus-visible { outline: 2px solid var(--chart); outline-offset: 2px; }
+
+.site { padding: clamp(20px, 4vw, 44px); display: grid; gap: 48px; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 36px; align-items: center; }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; } }
+.hero-copy { display: grid; gap: 16px; min-width: 0; }
+.hero-copy h2 { font-size: clamp(2rem, 5vw, 3.1rem); font-stretch: 68%; font-weight: 900; }
+.hero-copy h2 mark { background: var(--label); color: var(--label-ink); padding: 0 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: 500 0.82rem var(--body); border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.demo { display: grid; gap: 12px; min-width: 0; }
+.search { display: flex; align-items: center; gap: 10px; border: 2px solid var(--ink); border-radius: 10px; padding: 10px 14px; font-family: var(--mono); font-size: 0.95rem; background: var(--surface); min-height: 48px; }
+.search svg { flex: none; }
+.caret { display: inline-block; width: 2px; height: 1.1em; background: var(--ink); vertical-align: text-bottom; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.crawl-status { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); min-height: 1.2em; }
+
+.rows { display: grid; gap: 8px; }
+.row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); position: relative; overflow: hidden; }
+.row .store { font-weight: 600; font-size: 0.9rem; }
+.row .unit { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+.row .price { font-family: var(--mono); font-weight: 600; font-size: 1.05rem; font-variant-numeric: tabular-nums; text-align: right; }
+.thread { width: 22px; height: 22px; }
+.thread circle { fill: none; stroke: var(--muted); stroke-width: 2; }
+.row.done .thread circle { stroke: var(--good); }
+.row.best { border-color: var(--ink); background: var(--surface); }
+.row .best-label { position: absolute; right: 0; top: 0; font: 600 0.62rem var(--mono); letter-spacing: 0.06em; text-transform: uppercase; background: var(--label); color: var(--label-ink); padding: 2px 8px; border-bottom-left-radius: 6px; }
+.row:not(.best) .best-label { display: none; }
+.scan { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--label) 35%, transparent), transparent); transform: translateX(-100%); pointer-events: none; }
+
+.playing .row { opacity: 0.35; }
+.playing .row .price { visibility: hidden; }
+.row.in { opacity: 1 !important; transition: opacity .25s ease; }
+.row.in .scan { animation: scan .6s ease-out; }
+.row.done .price { visibility: visible !important; }
+.row.done .price { animation: tag-in .35s cubic-bezier(.2,.9,.3,1.3); }
+.row.best .best-label { animation: stamp .4s cubic-bezier(.2,.9,.3,1.4); }
+@keyframes scan { to { transform: translateX(100%); } }
+@keyframes tag-in { from { transform: translateY(6px) scale(.92); opacity: 0; } }
+@keyframes stamp { from { transform: scale(1.8) rotate(-8deg); opacity: 0; } }
+
+.history { display: grid; gap: 14px; }
+.history-head { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; justify-content: space-between; }
+.stat { font-family: var(--mono); font-size: 0.85rem; color: var(--muted); }
+.stat b { color: var(--good); font-weight: 600; }
+.chart-box { overflow-x: auto; }
+.chart { width: 100%; min-width: 420px; height: auto; display: block; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font: 11px var(--mono); }
+.chart .area { fill: color-mix(in srgb, var(--chart) 14%, transparent); }
+.chart .line { fill: none; stroke: var(--chart); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.chart .end { fill: var(--surface); stroke: var(--chart); stroke-width: 2.5; }
+.chart .end-label { fill: var(--ink); font: 600 12px var(--mono); }
+.chart.draw .line { animation: draw 1.6s ease-in-out both; }
+.chart.draw .area { animation: fade .6s 1.1s ease both; }
+.chart.draw .end, .chart.draw .end-label { animation: fade .3s 1.5s ease both; }
+@keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+@keyframes fade { from { opacity: 0; } }
+
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.step { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+.step .n { font: 600 0.75rem var(--mono); color: var(--muted); }
+
+.pipe { display: grid; gap: 14px; }
+.stages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; counter-reset: st; }
+.stage { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; background: var(--paper); transition: border-color .25s, background .25s, transform .25s; }
+.stage b { font: 600 0.85rem var(--body); }
+.stage span { font-size: 0.78rem; color: var(--muted); line-height: 1.4; }
+.stage .k { font: 600 0.66rem var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stage.yours { border-style: dashed; }
+.stage.yours .k { background: var(--label); color: var(--label-ink); width: fit-content; padding: 0 6px; }
+.pipe.flowing .stage { opacity: .4; }
+.pipe.flowing .stage.lit { opacity: 1; border-color: var(--ink); background: var(--surface); transform: translateY(-3px); }
+
+.extend { display: grid; gap: 16px; }
+.xsteps { display: grid; gap: 14px; }
+.xstep { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; align-items: start; }
+.xstep .n { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--ink); display: grid; place-items: center; font: 600 0.8rem var(--mono); }
+.xstep > div { min-width: 0; display: grid; gap: 6px; }
+pre { margin: 0; padding: 12px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; font: 0.8rem/1.55 var(--mono); }
+pre .hl { background: color-mix(in srgb, var(--label) 45%, transparent); }
+code { font-family: var(--mono); font-size: 0.88em; }
+.ctas { display: flex; flex-wrap: wrap; gap: 10px; }
+.cta { font: 600 0.88rem var(--body); text-decoration: none; padding: 9px 16px; border-radius: 8px; border: 2px solid var(--ink); color: var(--ink); }
+.cta.primary { background: var(--ink); color: var(--paper); }
+.cta:focus-visible { outline: 2px solid var(--chart); outline-offset: 2px; }
+
+@media (max-width: 640px) { .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.replay { font: 600 0.75rem var(--mono); border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+.replay:hover { border-color: var(--ink); }
+.status-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.page { max-width: 1040px; margin: 0 auto; padding-inline: 20px; }
+.nav { display: flex; align-items: center; gap: 16px; padding-block: 18px; }
+.nav .brand { display: flex; align-items: center; gap: 10px; font: 800 1.05rem var(--display); font-stretch: 85%; color: var(--ink); text-decoration: none; margin-right: auto; }
+.nav .brand img { width: 28px; height: 28px; border-radius: 6px; }
+.nav a { color: var(--ink); text-decoration: none; font-size: 0.92rem; font-weight: 500; }
+.nav a:hover { text-decoration: underline; }
+.site { padding-inline: 0; padding-block: 24px 64px; }
+.hero-copy h1 { font-size: clamp(2.2rem, 5.5vw, 3.6rem); font-stretch: 68%; font-weight: 900; }
+.hero-copy h1 mark { background: var(--label); color: var(--label-ink); padding: 0 6px; }
+.foot { border-top: 1px solid var(--line); padding-block: 24px 40px; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.85rem; color: var(--muted); }
+.foot a { color: var(--muted); }
+</style>
 </head>
 <body>
-    <img src="resources/images/icon.png" height="100" alt="Prices Crawler Logo">
-	<h1>Prices Crawler</h1>
-    <h2>Work in progress</h2>
+<div class="page">
+  <nav class="nav" aria-label="Main">
+    <a class="brand" href="./"><img src="resources/images/icon.png" alt="">Prices Crawler</a>
+    <a href="https://prices-crawler-web-app.vercel.app">Web app</a>
+    <a href="https://github.com/pricescrawler">GitHub</a>
+  </nav>
+  <main class="site">
+        <div class="hero">
+          <div class="hero-copy">
+            <span class="eyebrow">Open-source framework · Reactive Spring Boot · MIT</span>
+            <h1>Compare prices from <mark>any store</mark>. Write only the parser.</h1>
+            <p class="muted">content-base is a Java framework for building price APIs. Caching, price history, product lists, failure detection and the REST API come built in. Each store is one class.</p>
+            <div class="chips" role="group" aria-label="Sample product">
+              <button class="chip" type="button" id="chip-azeite" data-product="azeite" aria-pressed="true">Olive oil 750 ml</button>
+              <button class="chip" type="button" id="chip-cafe" data-product="cafe" aria-pressed="false">Coffee 250 g</button>
+              <button class="chip" type="button" id="chip-leite" data-product="leite" aria-pressed="false">Milk 6×1 L</button>
+            </div>
+          </div>
+
+          <div class="demo" id="demo">
+            <div class="search" aria-live="polite">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+              <span id="query">extra virgin olive oil 750 ml</span><span class="caret" aria-hidden="true"></span>
+            </div>
+            <div class="status-row"><div class="crawl-status" id="status">4 of 4 catalogs searched · 0.8 s</div><button class="replay" id="replay" type="button">Replay ↻</button></div>
+            <div class="rows" id="rows"></div>
+          </div>
+        </div>
+
+        <div class="history">
+          <div class="history-head">
+            <h3>Lowest price, last 12 weeks</h3>
+            <span class="stat" id="stat"></span>
+          </div>
+          <div class="chart-box">
+            <svg class="chart" id="chart" viewBox="0 0 640 230" role="img" aria-label="Price history chart"></svg>
+          </div>
+        </div>
+
+        <div class="pipe" id="pipe">
+          <div class="history-head">
+            <h3>What happens on every search</h3>
+            <span class="stat">BaseProductService</span>
+          </div>
+          <div class="stages">
+            <div class="stage"><span class="k">framework</span><b>Catalog active?</b><span>Disabled stores answer empty without touching the site.</span></div>
+            <div class="stage"><span class="k">framework</span><b>Cache</b><span>MongoDB or in-memory, per locale, catalog and query.</span></div>
+            <div class="stage yours"><span class="k">your code</span><b>Store parser</b><span>Search by query, by URL, and refresh list items.</span></div>
+            <div class="stage"><span class="k">framework</span><b>Normalized prices</b><span>Regular, campaign and unit price as numbers.</span></div>
+            <div class="stage"><span class="k">framework</span><b>History</b><span>Saved in the background on every live search.</span></div>
+            <div class="stage"><span class="k">framework</span><b>Metrics and errors</b><span>Failures become empty results and a broken-parser signal.</span></div>
+          </div>
+        </div>
+
+        <div class="extend">
+          <div class="history-head">
+            <h3>Add a store in 3 steps</h3>
+            <span class="stat">start from content-api-example</span>
+          </div>
+          <div class="xsteps">
+            <div class="xstep"><span class="n">1</span><div>
+              <b>Add the dependency</b>
+<pre>&lt;dependency&gt;
+  &lt;groupId&gt;io.github.pricescrawler.content&lt;/groupId&gt;
+  &lt;artifactId&gt;prices-crawler-content-controller&lt;/artifactId&gt;
+&lt;/dependency&gt;</pre>
+            </div></div>
+            <div class="xstep"><span class="n">2</span><div>
+              <b>Write one class per store</b>
+<pre>@Service
+@Qualifier(<span class="hl">"pt.mystore"</span>)
+public class MyStoreProductService extends BaseProductService {
+    protected Mono&lt;SearchProductsDto&gt; searchItemLogic(FilterProductByQueryDto f) { … }
+    protected Mono&lt;SearchProductDto&gt; searchItemByProductUrlLogic(FilterProductByUrlDto f) { … }
+    protected Mono&lt;ProductListItemDto&gt; updateItemLogic(ProductListItemDto item) { … }
+}</pre>
+            </div></div>
+            <div class="xstep"><span class="n">3</span><div>
+              <b>Register the catalog</b>
+              <p class="muted">Add a <code>locale</code> and a <code>catalog</code> document in MongoDB with the same key, <code>pt.mystore</code>. The store then shows up in the web app and the mobile app, and you can switch it on or off without a deploy.</p>
+            </div></div>
+          </div>
+          <div class="ctas">
+            <a class="cta primary" href="https://github.com/pricescrawler/content-api-example" target="_blank" rel="noopener">Use the example</a>
+            <a class="cta" href="https://github.com/pricescrawler/content-base" target="_blank" rel="noopener">content-base on GitHub</a>
+            <a class="cta" href="https://github.com/pricescrawler/documentation" target="_blank" rel="noopener">Documentation</a>
+          </div>
+  </main>
+  <footer class="foot">
+    <span>MIT licensed · non-commercial · not affiliated with any store</span>
+    <a href="https://github.com/pricescrawler/discussions">Discussions</a>
+  </footer>
+</div>
+<script>
+const products = {
+  azeite: {
+    query: "extra virgin olive oil 750 ml",
+    unit: "€/L",
+    qty: 0.75,
+    stores: [["Store A", 7.49], ["Store B", 6.99], ["Store C", 7.29], ["Store D", 7.89]],
+    history: [8.49, 8.49, 8.29, 8.29, 7.99, 7.99, 7.49, 7.69, 7.49, 7.29, 6.99, 6.99]
+  },
+  cafe: {
+    query: "ground coffee 250 g",
+    unit: "€/kg",
+    qty: 0.25,
+    stores: [["Store A", 3.19], ["Store B", 3.39], ["Store C", 2.99], ["Store D", 3.29]],
+    history: [2.79, 2.79, 2.89, 2.89, 2.99, 2.99, 3.09, 3.09, 2.99, 3.19, 2.99, 2.99]
+  },
+  leite: {
+    query: "semi-skimmed milk 6x1 l",
+    unit: "€/L",
+    qty: 6,
+    stores: [["Store A", 5.34], ["Store B", 5.40], ["Store C", 5.58], ["Store D", 4.98]],
+    history: [5.22, 5.22, 5.10, 5.10, 5.16, 5.04, 5.04, 4.98, 5.04, 4.98, 4.98, 4.98]
+  }
+};
+
+const euro = v => "€" + v.toFixed(2);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = id => document.getElementById(id);
+let current = "azeite";
+let runId = 0;
+
+function renderRows(p) {
+  const min = Math.min(...p.stores.map(s => s[1]));
+  $("rows").innerHTML = p.stores.map(([name, price]) => `
+    <div class="row${price === min ? " best" : ""} in done">
+      <span class="scan"></span>
+      <svg class="thread" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle></svg>
+      <div><div class="store">${name}</div><div class="unit">€${(price / p.qty).toFixed(2)}/${p.unit.split("/")[1]}</div></div>
+      <span class="price">${euro(price)}</span>
+      <span class="best-label">cheapest</span>
+    </div>`).join("");
+}
+
+function renderChart(p, animate, svg = $("chart")) {
+  const W = 640, H = 230, L = 52, R = 70, T = 16, B = 34;
+  const h = p.history;
+  const lo = Math.floor(Math.min(...h) * 2) / 2 - 0.25, hi = Math.ceil(Math.max(...h) * 2) / 2 + 0.25;
+  const x = i => L + i * (W - L - R) / (h.length - 1);
+  const y = v => T + (hi - v) * (H - T - B) / (hi - lo);
+  const ticks = [];
+  for (let v = Math.ceil(lo * 2) / 2; v <= hi; v += 0.5) ticks.push(v);
+  const pts = h.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const line = "M" + pts.join(" L");
+  const area = `${line} L${x(h.length - 1)},${H - B} L${x(0)},${H - B} Z`;
+  const last = h[h.length - 1];
+  svg.innerHTML = `
+    ${ticks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"></line>
+      <text class="axis" x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${v.toFixed(2)}</text>`).join("")}
+    ${[0, 3, 6, 9, 11].map(i => `<text class="axis" x="${x(i)}" y="${H - 10}" text-anchor="middle">wk ${i + 1}</text>`).join("")}
+    <path class="area" d="${area}"></path>
+    <path class="line" d="${line}"></path>
+    <circle class="end" cx="${x(h.length - 1)}" cy="${y(last)}" r="5"></circle>
+    <text class="end-label" x="${x(h.length - 1) + 10}" y="${y(last) + 4}">${euro(last)}</text>`;
+  const path = svg.querySelector(".line");
+  const len = Math.ceil(path.getTotalLength());
+  path.style.strokeDasharray = len;
+  path.style.setProperty("--len", len);
+  svg.classList.remove("draw");
+  if (animate && !reduceMotion) { void svg.getBoundingClientRect(); svg.classList.add("draw"); }
+
+  if (svg.id !== "chart") return;
+  const first = h[0];
+  const diff = (last - first) / first * 100;
+  const lowest = Math.min(...h) === last;
+  $("stat").innerHTML = `${euro(first)} → ${euro(last)} · <b>${diff > 0 ? "+" : ""}${diff.toFixed(0)}%</b>${lowest ? " · 12-week low" : ""}`;
+  $("stat").querySelector("b").style.color = diff > 0 ? "var(--muted)" : "var(--good)";
+}
+
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+async function play(key) {
+  const id = ++runId;
+  const p = products[key];
+  renderRows(p);
+  renderChart(p, false);
+  if (reduceMotion) { $("query").textContent = p.query; renderChart(p, false); return; }
+
+  const demo = $("demo"), rows = [...$("rows").children];
+  rows.forEach(r => r.classList.remove("in", "done", "best"));
+  demo.classList.add("playing");
+  $("status").textContent = "typing…";
+  $("query").textContent = "";
+  for (const ch of p.query) {
+    if (id !== runId) return;
+    $("query").textContent += ch;
+    await wait(38);
+  }
+  $("status").textContent = "searching 4 catalogs…";
+  rows.forEach((r, i) => setTimeout(() => id === runId && r.classList.add("in"), i * 90));
+  const order = rows.map((r, i) => i).sort(() => Math.random() - 0.5);
+  let done = 0;
+  for (const i of order) {
+    await wait(220 + Math.random() * 260);
+    if (id !== runId) return;
+    rows[i].classList.add("done");
+    done++;
+    $("status").textContent = `${done} of 4 catalogs searched`;
+  }
+  await wait(250);
+  if (id !== runId) return;
+  const min = Math.min(...p.stores.map(s => s[1]));
+  rows[p.stores.findIndex(s => s[1] === min)].classList.add("best");
+  demo.classList.remove("playing");
+  $("status").textContent = "4 of 4 catalogs searched · 1.2 s";
+  renderChart(p, true);
+  await flow(id);
+}
+
+async function flow(id) {
+  const pipe = $("pipe"), stages = [...pipe.querySelectorAll(".stage")];
+  pipe.classList.add("flowing");
+  for (const st of stages) {
+    if (id !== runId) break;
+    stages.forEach(x => x.classList.remove("lit"));
+    st.classList.add("lit");
+    await wait(450);
+  }
+  stages.forEach(x => x.classList.remove("lit"));
+  pipe.classList.remove("flowing");
+}
+
+document.querySelectorAll(".chip").forEach(chip => chip.addEventListener("click", () => {
+  current = chip.dataset.product;
+  document.querySelectorAll(".chip").forEach(c => c.setAttribute("aria-pressed", String(c === chip)));
+  play(current);
+}));
+$("replay").addEventListener("click", () => play(current));
+
+renderRows(products.azeite);
+renderChart(products.azeite, false);
+setTimeout(() => play("azeite"), 400);
+</script>
 </body>
 </html>
